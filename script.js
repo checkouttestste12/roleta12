@@ -1,4 +1,4 @@
-// ===== ROLETA FUNCIONAL COM GIRO E PARADA =====
+// ===== ROLETA FUNCIONAL COM GIRO E PARADA PROFISSIONAL =====
 
 // Estados da roleta
 const ESTADOS_ROLETA = {
@@ -19,7 +19,9 @@ let gameState = {
     velocidadeAtual: 0,
     anguloAtual: 0,
     roletaElement: null,
-    autoStopTimeout: null // Adicionado para controlar o timeout de auto-parada
+    autoStopTimeout: null,
+    anguloFinal: 0, // Ângulo onde a roleta deve parar
+    desacelerando: false
 };
 
 // Elementos DOM
@@ -27,6 +29,7 @@ const elements = {
     btnGirar: null,
     btnParar: null,
     roleta: null,
+    roletaPointer: null,
     toastContainer: null,
     resultadoModal: null,
     btnContinuar: null,
@@ -36,19 +39,31 @@ const elements = {
     saldoAtual: null
 };
 
-// Configuração de prêmios
+// Configuração de prêmios com setores da roleta
 const premiosPossiveis = [
-    { valor: 0, texto: 'Tente novamente!', peso: 50 },
-    { valor: 25, texto: 'R$ 25,00', peso: 25 },
-    { valor: 50, texto: 'R$ 50,00', peso: 15 },
-    { valor: 75, texto: 'R$ 75,00', peso: 10 }
+    { valor: 0, texto: 'Tente novamente!', peso: 50, setor: 'cinza' },
+    { valor: 25, texto: 'R$ 25,00', peso: 25, setor: 'dourado' },
+    { valor: 50, texto: 'R$ 50,00', peso: 15, setor: 'vermelho' },
+    { valor: 75, texto: 'R$ 75,00', peso: 10, setor: 'azul' }
+];
+
+// Mapeamento dos setores da roleta (8 setores de 45 graus cada)
+const setoresRoleta = [
+    { inicio: 0, fim: 45, cor: 'dourado', premio: premiosPossiveis[1] },      // 0-45°
+    { inicio: 45, fim: 90, cor: 'cinza', premio: premiosPossiveis[0] },       // 45-90°
+    { inicio: 90, fim: 135, cor: 'vermelho', premio: premiosPossiveis[2] },   // 90-135°
+    { inicio: 135, fim: 180, cor: 'cinza', premio: premiosPossiveis[0] },     // 135-180°
+    { inicio: 180, fim: 225, cor: 'azul', premio: premiosPossiveis[3] },      // 180-225°
+    { inicio: 225, fim: 270, cor: 'cinza', premio: premiosPossiveis[0] },     // 225-270°
+    { inicio: 270, fim: 315, cor: 'dourado', premio: premiosPossiveis[1] },   // 270-315°
+    { inicio: 315, fim: 360, cor: 'cinza', premio: premiosPossiveis[0] }      // 315-360°
 ];
 
 // ===== FUNÇÕES PRINCIPAIS =====
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🎰 RoletaWin - Iniciando sistema corrigido...');
+    console.log('🎰 RoletaWin - Iniciando sistema profissional...');
     inicializarElementos();
     inicializarEventListeners();
     atualizarInterface();
@@ -60,6 +75,7 @@ function inicializarElementos() {
     elements.btnGirar = document.getElementById('btn-girar');
     elements.btnParar = document.getElementById('btn-parar');
     elements.roleta = document.getElementById('roleta');
+    elements.roletaPointer = document.getElementById('roleta-pointer');
     elements.toastContainer = document.getElementById('toast-container');
     elements.resultadoModal = document.getElementById('resultado-modal');
     elements.btnContinuar = document.getElementById('btn-continuar');
@@ -105,19 +121,29 @@ function inicializarEventListeners() {
 
 // Iniciar giro
 function iniciarGiro() {
-    console.log('🎯 Iniciando giro...');
+    console.log('🎯 Iniciando giro profissional...');
     
     if (gameState.estadoRoleta !== ESTADOS_ROLETA.IDLE || gameState.girosRestantes <= 0) {
         console.log('❌ Não é possível girar agora. Estado:', gameState.estadoRoleta, 'Giros:', gameState.girosRestantes);
         return;
     }
     
+    // Calcular ângulo final baseado no prêmio sorteado
+    const premioSorteado = sortearPremio();
+    const setorEscolhido = encontrarSetorPorPremio(premioSorteado);
+    gameState.anguloFinal = calcularAnguloFinal(setorEscolhido);
+    
+    console.log('🎲 Prêmio sorteado:', premioSorteado);
+    console.log('🎯 Setor escolhido:', setorEscolhido);
+    console.log('📐 Ângulo final calculado:', gameState.anguloFinal);
+    
     // Atualizar estado
     gameState.estadoRoleta = ESTADOS_ROLETA.SPINNING;
     gameState.girosRestantes--;
     gameState.tempoInicioGiro = Date.now();
-    gameState.velocidadeAtual = 15; // Velocidade inicial
+    gameState.velocidadeAtual = 20; // Velocidade inicial mais alta
     gameState.anguloAtual = 0;
+    gameState.desacelerando = false;
     
     console.log('✅ Estado atualizado para SPINNING');
     
@@ -127,15 +153,13 @@ function iniciarGiro() {
         elements.btnParar.classList.remove('hidden');
         elements.btnParar.disabled = true; // Desabilitado inicialmente
         elements.btnParar.innerHTML = '<i class="fas fa-clock"></i><span>AGUARDE...</span>';
-        console.log('✅ Botões trocados - GIRAR oculto, PARAR visível. Display btnGirar:', elements.btnGirar.style.display, 'Display btnParar:', elements.btnParar.style.display);
+        console.log('✅ Botões trocados - GIRAR oculto, PARAR visível');
     }
     
     // Adicionar efeitos visuais à roleta
     if (elements.roleta) {
-        elements.roleta.style.filter = 'brightness(1.3) saturate(1.5)';
-        elements.roleta.style.boxShadow = '0 0 40px rgba(255, 215, 0, 0.8)';
-        elements.roleta.classList.remove('parada');
-        elements.roleta.classList.add('girando'); // Adiciona classe para animação CSS
+        elements.roleta.classList.remove('parada', 'desacelerando');
+        elements.roleta.classList.add('girando');
         console.log('✅ Efeitos visuais aplicados à roleta');
     }
     
@@ -163,30 +187,86 @@ function iniciarGiro() {
     }, 10000);
 }
 
-// Animação contínua da roleta
+// Sortear prêmio baseado nas probabilidades
+function sortearPremio() {
+    const totalPeso = premiosPossiveis.reduce((total, premio) => total + premio.peso, 0);
+    const random = Math.random() * totalPeso;
+    
+    let acumulado = 0;
+    for (let i = 0; i < premiosPossiveis.length; i++) {
+        acumulado += premiosPossiveis[i].peso;
+        if (random <= acumulado) {
+            return premiosPossiveis[i];
+        }
+    }
+    
+    // Fallback
+    return premiosPossiveis[0];
+}
+
+// Encontrar setor correspondente ao prêmio
+function encontrarSetorPorPremio(premio) {
+    // Filtrar setores que correspondem ao prêmio
+    const setoresValidos = setoresRoleta.filter(setor => 
+        setor.premio.valor === premio.valor
+    );
+    
+    // Escolher um setor aleatório entre os válidos
+    const indiceAleatorio = Math.floor(Math.random() * setoresValidos.length);
+    return setoresValidos[indiceAleatorio];
+}
+
+// Calcular ângulo final para parar no setor escolhido
+function calcularAnguloFinal(setor) {
+    // Escolher um ângulo aleatório dentro do setor
+    const anguloNoSetor = setor.inicio + Math.random() * (setor.fim - setor.inicio);
+    
+    // Adicionar voltas completas para tornar o giro mais interessante
+    const voltasCompletas = 3 + Math.random() * 2; // 3-5 voltas
+    const anguloTotal = (voltasCompletas * 360) + anguloNoSetor;
+    
+    return anguloTotal;
+}
+
+// Animação contínua da roleta com efeito profissional
 function iniciarAnimacaoRoleta() {
-    console.log('🔄 Iniciando animação da roleta');
+    console.log('🔄 Iniciando animação profissional da roleta');
     
     function animar() {
         if (gameState.estadoRoleta === ESTADOS_ROLETA.SPINNING || gameState.estadoRoleta === ESTADOS_ROLETA.STOPPING) {
+            
+            if (gameState.estadoRoleta === ESTADOS_ROLETA.STOPPING && !gameState.desacelerando) {
+                // Iniciar desaceleração suave
+                gameState.desacelerando = true;
+                if (elements.roleta) {
+                    elements.roleta.classList.remove('girando');
+                    elements.roleta.classList.add('desacelerando');
+                }
+                console.log('🛑 Iniciando desaceleração suave');
+            }
+            
+            // Calcular nova velocidade e ângulo
+            if (gameState.desacelerando) {
+                // Desaceleração suave até o ângulo final
+                const distanciaRestante = gameState.anguloFinal - gameState.anguloAtual;
+                
+                if (Math.abs(distanciaRestante) < 5) {
+                    // Muito próximo do final, parar
+                    gameState.anguloAtual = gameState.anguloFinal;
+                    finalizarGiro();
+                    return;
+                } else {
+                    // Ajustar velocidade baseada na distância restante
+                    gameState.velocidadeAtual = Math.max(0.5, distanciaRestante * 0.02);
+                }
+            }
+            
             // Atualizar ângulo
             gameState.anguloAtual += gameState.velocidadeAtual;
             
             // Aplicar rotação
             if (elements.roleta) {
                 elements.roleta.style.transform = `rotate(${gameState.anguloAtual}deg)`;
-            }
-            
-            // Se estiver parando, reduzir velocidade gradualmente
-            if (gameState.estadoRoleta === ESTADOS_ROLETA.STOPPING) {
-                gameState.velocidadeAtual *= 0.92; // Desaceleração mais suave
-                
-                // Parar quando velocidade for muito baixa
-                if (gameState.velocidadeAtual < 0.3) {
-                    console.log('🛑 Velocidade baixa, finalizando giro');
-                    finalizarGiro();
-                    return;
-                }
             }
             
             gameState.animationId = requestAnimationFrame(animar);
@@ -236,17 +316,23 @@ function finalizarGiro() {
         console.log('✅ Animação parada');
     }
     
-    // Remover efeitos visuais
+    // Remover efeitos visuais da roleta
     if (elements.roleta) {
-        elements.roleta.style.filter = '';
-        elements.roleta.style.boxShadow = '';
-        elements.roleta.classList.remove('girando'); // Remove a classe de animação
+        elements.roleta.classList.remove('girando', 'desacelerando');
         elements.roleta.classList.add('parada');
     }
     
+    // Animar seta indicadora
+    if (elements.roletaPointer) {
+        elements.roletaPointer.classList.add('resultado');
+        setTimeout(() => {
+            elements.roletaPointer.classList.remove('resultado');
+        }, 2000);
+    }
+    
     // Calcular resultado baseado no ângulo final
-    const premio = calcularPremio();
-    console.log('🎁 Prêmio calculado:', premio);
+    const premio = calcularPremioFinal();
+    console.log('🎁 Prêmio final calculado:', premio);
     
     // Atualizar saldo
     gameState.saldoAtual += premio.valor;
@@ -259,30 +345,25 @@ function finalizarGiro() {
         setTimeout(() => {
             resetarBotoes();
         }, 1000);
-    }, 500);
+    }, 800);
 }
 
 // Calcular prêmio baseado no ângulo final da roleta
-function calcularPremio() {
+function calcularPremioFinal() {
     // Normalizar ângulo para 0-360
     const anguloNormalizado = gameState.anguloAtual % 360;
     console.log('📐 Ângulo final normalizado:', anguloNormalizado);
     
-    // Usar sistema de probabilidades ponderadas
-    const totalPeso = premiosPossiveis.reduce((total, premio) => total + premio.peso, 0);
-    const random = Math.random() * totalPeso;
-    
-    let acumulado = 0;
-    for (let i = 0; i < premiosPossiveis.length; i++) {
-        acumulado += premiosPossiveis[i].peso;
-        if (random <= acumulado) {
-            console.log('🎯 Prêmio selecionado:', premiosPossiveis[i]);
-            return premiosPossiveis[i];
+    // Encontrar o setor correspondente
+    for (let setor of setoresRoleta) {
+        if (anguloNormalizado >= setor.inicio && anguloNormalizado < setor.fim) {
+            console.log('🎯 Setor encontrado:', setor);
+            return setor.premio;
         }
     }
     
-    // Fallback
-    return premiosPossiveis[0];
+    // Fallback para o último setor (360°)
+    return setoresRoleta[setoresRoleta.length - 1].premio;
 }
 
 // Mostrar resultado
@@ -360,7 +441,7 @@ function resetarBotoes() {
         elements.btnGirar.innerHTML = '<i class="fas fa-play"></i><span>GIRAR</span><div class="btn-bg"></div>';
         elements.btnParar.disabled = false;
         elements.btnParar.innerHTML = '<i class="fas fa-stop"></i><span>PARAR</span><div class="btn-bg"></div>';
-        console.log('✅ Botões resetados. Display btnGirar:', elements.btnGirar.style.display, 'Display btnParar:', elements.btnParar.style.display);
+        console.log('✅ Botões resetados');
     }
 }
 
@@ -513,11 +594,15 @@ window.debugRoleta = function() {
         giros: gameState.girosRestantes,
         saldo: gameState.saldoAtual,
         angulo: gameState.anguloAtual,
-        velocidade: gameState.velocidadeAtual
+        anguloFinal: gameState.anguloFinal,
+        velocidade: gameState.velocidadeAtual,
+        desacelerando: gameState.desacelerando
     });
+    
+    console.log('🎯 Setores da roleta:', setoresRoleta);
 };
 
 // Log de inicialização
-console.log('🎰 RoletaWin - Script carregado com sucesso!');
+console.log('🎰 RoletaWin - Script profissional carregado com sucesso!');
 console.log('💡 Use debugRoleta() no console para ver o estado atual');
 
