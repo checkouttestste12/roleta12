@@ -122,11 +122,11 @@ function iniciarGiro() {
     
     // Atualizar interface - trocar botões
     if (elements.btnGirar && elements.btnParar) {
-        elements.btnGirar.style.display = 'none';
-        elements.btnParar.style.display = 'flex';
+        elements.btnGirar.classList.add('hidden');
+        elements.btnParar.classList.remove('hidden');
         elements.btnParar.disabled = true; // Desabilitado inicialmente
         elements.btnParar.innerHTML = '<i class="fas fa-clock"></i><span>AGUARDE...</span>';
-        console.log('✅ Botões trocados - GIRAR oculto, PARAR visível');
+        console.log('✅ Botões trocados - GIRAR oculto, PARAR visível. Display btnGirar:', elements.btnGirar.style.display, 'Display btnParar:', elements.btnParar.style.display);
     }
     
     // Adicionar efeitos visuais à roleta
@@ -345,15 +345,13 @@ function resetarBotoes() {
     console.log('🔄 Resetando botões');
     
     if (elements.btnGirar && elements.btnParar) {
-        elements.btnGirar.style.display = 'flex';
+        elements.btnGirar.classList.remove('hidden');
+        elements.btnParar.classList.add('hidden');
         elements.btnGirar.disabled = false;
         elements.btnGirar.innerHTML = '<i class="fas fa-play"></i><span>GIRAR</span><div class="btn-bg"></div>';
-        
-        elements.btnParar.style.display = 'none';
         elements.btnParar.disabled = false;
         elements.btnParar.innerHTML = '<i class="fas fa-stop"></i><span>PARAR</span><div class="btn-bg"></div>';
-        
-        console.log('✅ Botões resetados');
+        console.log('✅ Botões resetados. Display btnGirar:', elements.btnGirar.style.display, 'Display btnParar:', elements.btnParar.style.display);
     }
 }
 
