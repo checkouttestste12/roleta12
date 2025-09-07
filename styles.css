@@ -446,9 +446,13 @@ body {
         #2a2a2a 315deg 360deg
     );
     border: 2px solid #ffd700;
-    animation: rotateMini 3s linear infinite;
     box-shadow: 0 4px 20px rgba(255, 215, 0, 0.3);
     transition: all 0.3s ease;
+}
+
+/* Animação de giro da roleta */
+.roleta-mini.girando {
+    animation: rotateMini 3s linear infinite;
 }
 
 /* Parar animação quando não estiver girando */
@@ -599,7 +603,7 @@ body {
     background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%) !important;
     color: #ffffff !important;
     box-shadow: 0 8px 32px rgba(255, 107, 107, 0.3);
-    display: none;
+    /* Removido display: none; para que a classe hidden controle a visibilidade */
     position: relative;
     border: none;
     padding: 1rem 2rem;
