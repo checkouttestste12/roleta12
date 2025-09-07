@@ -18,7 +18,8 @@ let gameState = {
     animationId: null,
     velocidadeAtual: 0,
     anguloAtual: 0,
-    roletaElement: null
+    roletaElement: null,
+    autoStopTimeout: null // Adicionado para controlar o timeout de auto-parada
 };
 
 // Elementos DOM
@@ -134,6 +135,7 @@ function iniciarGiro() {
         elements.roleta.style.filter = 'brightness(1.3) saturate(1.5)';
         elements.roleta.style.boxShadow = '0 0 40px rgba(255, 215, 0, 0.8)';
         elements.roleta.classList.remove('parada');
+        elements.roleta.classList.add('girando'); // Adiciona classe para animação CSS
         console.log('✅ Efeitos visuais aplicados à roleta');
     }
     
@@ -153,7 +155,7 @@ function iniciarGiro() {
     }, gameState.tempoMinimoGiro);
     
     // Auto-parar após 10 segundos se o usuário não parar
-    setTimeout(() => {
+    gameState.autoStopTimeout = setTimeout(() => {
         if (gameState.estadoRoleta === ESTADOS_ROLETA.SPINNING) {
             console.log('⏰ Auto-parando após 10 segundos');
             pararGiro();
@@ -203,6 +205,12 @@ function pararGiro() {
         return;
     }
     
+    // Limpar o timeout de auto-parada se o usuário parar manualmente
+    if (gameState.autoStopTimeout) {
+        clearTimeout(gameState.autoStopTimeout);
+        gameState.autoStopTimeout = null;
+    }
+
     gameState.estadoRoleta = ESTADOS_ROLETA.STOPPING;
     
     // Atualizar botão
@@ -232,6 +240,7 @@ function finalizarGiro() {
     if (elements.roleta) {
         elements.roleta.style.filter = '';
         elements.roleta.style.boxShadow = '';
+        elements.roleta.classList.remove('girando'); // Remove a classe de animação
         elements.roleta.classList.add('parada');
     }
     
